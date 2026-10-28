@@ -483,7 +483,14 @@ async def on_download(ev):
 async def main():
     global user, bot
     proxy = _telethon_proxy()
-    user = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH, proxy=proxy)
+    # مشخصات دستگاه شبیه تلگرام دسکتاپ (برای سازگاری با API_ID عمومی تلگرام دسکتاپ)
+    user = TelegramClient(
+        StringSession(SESSION_STRING), API_ID, API_HASH, proxy=proxy,
+        device_model=os.getenv("DEVICE_MODEL", "Desktop"),
+        system_version=os.getenv("SYSTEM_VERSION", "Windows 10"),
+        app_version=os.getenv("APP_VERSION", "5.6.3 x64"),
+        lang_code="en", system_lang_code="en-US",
+    )
     if PORT:
         asyncio.create_task(health_server())
     if SELF_URL:
