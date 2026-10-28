@@ -316,16 +316,31 @@ async def handle_login(ev, text):
         if not phone:
             await ev.respond("شماره رو این‌طوری بفرست:\n<code>/login +4915xxxxxxx</code>", parse_mode="html")
             return True
+        if LOGIN.get(uid, {}).get("phone") == phone:
+            await ev.respond("📩 کد قبلاً فرستاده شده — همون کد رو با فاصله بفرست (مثلاً <code>1 2 3 4 5</code>).\n"
+                             "برای شروع از اول: <code>/cancel</code>", parse_mode="html")
+            return True
+        getattr(user, "_phone_code_hash", {}).pop(phone, None)  # همیشه درخواست تازه، نه Resend
         try:
             sent = await user.send_code_request(phone)
+        except errors.FloodWaitError as e:
+            await ev.respond(f"⏳ تلگرام موقتاً محدود کرده. {e.seconds // 60 + 1} دقیقه دیگه فقط یک بار امتحان کن.")
+            return True
         except Exception as e:
-            await ev.respond(f"❌ {e}")
+            msg = str(e)
+            if "all available options" in msg or "FLOOD" in msg.upper():
+                msg = "تلگرام برای این شماره فعلاً کد جدید نمی‌فرسته. ۲-۳ ساعت دیگه فقط یک بار /login بزن."
+            await ev.respond(f"❌ {msg}")
             return True
         LOGIN[uid] = {"step": "code", "phone": phone, "hash": sent.phone_code_hash}
         await ev.respond(
             "📩 کد تأیید رو تو تلگرامِ اون شماره ببین و اینجا بفرست.\n"
             "⚠️ حتماً با فاصله بین رقم‌ها، مثلاً <code>1 2 3 4 5</code>\n"
             "(وگرنه تلگرام کد رو باطل می‌کنه)", parse_mode="html")
+        return True
+    if text.startswith("/cancel"):
+        LOGIN.pop(uid, None)
+        await ev.respond("لغو شد.")
         return True
     st = LOGIN.get(uid)
     if not st:
@@ -345,9 +360,12 @@ async def handle_login(ev, text):
                 await ev.delete()
             except Exception:
                 pass
+    except (errors.PhoneCodeInvalidError, errors.PasswordHashInvalidError):
+        await ev.respond("❌ اشتباه بود — دوباره بفرست (کد با فاصله).")
+        return True
     except Exception as e:
         LOGIN.pop(uid, None)
-        await ev.respond(f"❌ لاگین ناموفق: {e}\nدوباره /login بزن.")
+        await ev.respond(f"❌ لاگین ناموفق: {e}\nبعداً یک بار /login بزن.")
         return True
     LOGIN.pop(uid, None)
     me = await user.get_me()
